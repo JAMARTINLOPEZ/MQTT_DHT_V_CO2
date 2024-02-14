@@ -1,0 +1,14 @@
+
+
+DisplayArea KEYWORD1
+DisplayNumber KEYWORD1
+
+setFont KEYWORD2
+setPosition KEYWORD2
+setFormat KEYWORD2
+begin KEYWORD2
+setTextColor KEYWORD2
+setBackgroundColour KEYWORD2
+draw KEYWORD2
+
+
