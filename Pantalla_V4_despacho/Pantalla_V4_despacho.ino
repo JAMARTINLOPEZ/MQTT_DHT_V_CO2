@@ -417,9 +417,9 @@ void loop() {
 
 
 
-  long now3 = millis();
-  if (now3 - lastMsg3 > 1000) {
-  lastMsg3 = now3;
+  //long now3 = millis();
+  //if (now3 - lastMsg3 > 1000) {
+  //lastMsg3 = now3;
   char pulsadorString[8];
   dtostrf(estadopulsador, 1, 2, pulsadorString);
   //Serial.print("Estado pulsador: ");
@@ -430,7 +430,7 @@ void loop() {
   if (estadopulsador == LOW){
   client.publish("homeassistant/quarth-meter/comluz", "true");
   Serial.println("Enviando encendido a luz");
-  delay(2000);
+  delay(1000);
   }
   //else{
   //client.publish("homeassistant/quarth-meter2/comluz", "false")
