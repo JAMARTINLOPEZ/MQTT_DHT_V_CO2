@@ -49,6 +49,19 @@ MHZ19 myMHZ19;
 #define GRAY (225, 227, 240)
 #define UMA (0, 51, 102)
 
+//ESTA ES LA UNICA LINEA QUE SE DEBE DE MODIFICAR AL PROGRAMAR UNA SONDA//
+#define NUMERO_SONDA "sonda04"
+/////////////////////////////////////////////////////////////////////////////////
+#define TOPIC_LEDON "homeassistant/" NUMERO_SONDA "/termostatoOn"
+#define TOPIC_LEDOFF "homeassistant/" NUMERO_SONDA "/termostatoOff"
+#define TOPIC_TERMOSTATO "homeassistant/" NUMERO_SONDA "/rele"
+#define TOPIC_PUERTA "homeassistant/" NUMERO_SONDA "/smartlock"
+#define TOPIC_HUMEDAD "homeassistant/" NUMERO_SONDA "/humidity"
+#define TOPIC_TEMPERATURA "homeassistant/" NUMERO_SONDA "/temperature"
+#define TOPIC_CO2 "homeassistant/" NUMERO_SONDA "/co2"
+#define TOPIC_PULSADOR "homeassistant/" NUMERO_SONDA "/comluz"
+
+
 int co2mhz;
 
 // Replace the next variables with your SSID/Password combination
@@ -59,7 +72,8 @@ const char* password = "Domotica4$";
 
 const int pulsador = 26;
 const int pinTension = 34;  // Pin de entrada para medir la tensión
-const int rele = 27;
+const int termostato = 27;
+const int puerta = 33;
 unsigned long lastMsg2 = 0;
 unsigned long lastMsg3 = 0;
 bool primeraEjecucion = true;
@@ -270,9 +284,11 @@ void setup() {
   myMHZ19.begin(Serial1); 
   myMHZ19.autoCalibration();
   pinMode(pinTension, INPUT);
-  pinMode(rele, OUTPUT);
+  pinMode(termostato, OUTPUT);
+  pinMode(puerta, OUTPUT);
   pinMode(pulsador, INPUT);
-  digitalWrite(rele, LOW);
+  digitalWrite(termostato, LOW);
+  digitalWrite(puerta, LOW);
   dht.begin();
   // Inicialización de LVGL
   lcd.init();
@@ -338,23 +354,44 @@ void callback(char* topic, byte* message, unsigned int length) {
   }
   Serial.println();
   Serial.print(messageTemp);
-  if (String(topic) == "homeassistant/quarth-meter/rele") {
+  if (String(topic) == TOPIC_TERMOSTATO) {
     Serial.print("Changing output to ");
     if(messageTemp == "true"){
       Serial.println("on");
-      digitalWrite(rele, LOW);
+      digitalWrite(termostato, LOW);
       delay(300);
-      digitalWrite(rele, HIGH);
+      digitalWrite(termostato, HIGH);
       delay(300);
-      digitalWrite(rele, LOW);
+      digitalWrite(termostato, LOW);
     }
     else if(messageTemp == "false"){
       Serial.println("off");
-      digitalWrite(rele, LOW);
+      digitalWrite(termostato, LOW);
       delay(300);
-      digitalWrite(rele, HIGH);
+      digitalWrite(termostato, HIGH);
       delay(300);
-      digitalWrite(rele, LOW);
+      digitalWrite(termostato, LOW);
+
+    }
+  
+  }
+    if (String(topic) == TOPIC_PUERTA) {
+    Serial.print("Changing output to ");
+    if(messageTemp == "true"){
+      Serial.println("on");
+      digitalWrite(puerta, LOW);
+      delay(300);
+      digitalWrite(puerta, HIGH);
+      delay(300);
+      digitalWrite(puerta, LOW);
+    }
+    else if(messageTemp == "false"){
+      Serial.println("off");
+      digitalWrite(puerta, LOW);
+      delay(300);
+      digitalWrite(puerta, HIGH);
+      delay(300);
+      digitalWrite(puerta, LOW);
 
     }
   
@@ -368,10 +405,11 @@ void reconnect() {
   if (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect("Sonda", "Raspi_Dali_1", "admin")) {
+    if (client.connect(NUMERO_SONDA, "Raspi_Dali_1", "admin")) {
       Serial.println("connected");
       // Subscribe
-      client.subscribe("homeassistant/quarth-meter/rele");
+      client.subscribe(TOPIC_TERMOSTATO);
+      client.subscribe(TOPIC_PUERTA);
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -428,7 +466,7 @@ void loop() {
   //Serial.println("V");
   
   if (estadopulsador == LOW){
-  client.publish("homeassistant/quarth-meter/comluz", "true");
+  client.publish(TOPIC_PULSADOR, "true");
   Serial.println("Enviando encendido a luz");
   delay(1000);
   }
@@ -436,6 +474,7 @@ void loop() {
   //client.publish("homeassistant/quarth-meter2/comluz", "false")
   //}
   //}
+  
 
 
 
@@ -450,12 +489,12 @@ void loop() {
     if (tension >= 3) {
       //Serial.println("on");
       // Si la tensión es 3.3, publica "on"
-      client.publish("homeassistant/quarth-meter/termostatoOn", "100");
+      client.publish(TOPIC_LEDON, "100");
           }   
       else {
       //Serial.println("off");
       // Si la tensión no es 3.3, publica "off"
-      client.publish("homeassistant/quarth-meter/termostatoOff", "0");
+      client.publish(TOPIC_LEDOFF, "0");
       }
       
   }
@@ -472,7 +511,7 @@ void loop() {
     dtostrf(co2mhz, 1, 2, co2String);
     //Serial.print("Co2: ");
     //Serial.println(co2String);
-    client.publish("homeassistant/quarth-meter/co2", co2String);
+    client.publish(TOPIC_CO2, co2String);
 
     // Temperature in Celsius
     temperature = dht.readTemperature();   
@@ -485,7 +524,7 @@ void loop() {
     dtostrf(temperature, 1, 2, tempString);
     //Serial.print("Temperature: ");
     //Serial.println(tempString);
-    client.publish("homeassistant/quarth-meter/temperature", tempString);
+    client.publish(TOPIC_TEMPERATURA, tempString);
 
     humidity = dht.readHumidity();
     
@@ -494,7 +533,7 @@ void loop() {
     dtostrf(humidity, 1, 2, humString);
     //Serial.print("Humidity: ");
     //Serial.println(humString);
-    client.publish("homeassistant/quarth-meter/humidity", humString);
+    client.publish(TOPIC_HUMEDAD, humString);
 
     valores();
     }
@@ -526,3 +565,6 @@ void valores(){
  lcd.pushImage(280, 150, 172, 162, img);
  //delay(10000);
 }
+
+
+
