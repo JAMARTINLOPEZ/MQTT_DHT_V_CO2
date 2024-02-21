@@ -468,7 +468,7 @@ void loop() {
   
   if (estadopulsador == LOW && cambiarestadopulsador == 0){
   client.publish(TOPIC_PULSADOR, "true");
-  Serial.println("Enviando encendido a luz");
+  //Serial.println("Enviando encendido a luz");
   cambiarestadopulsador = 1;
   delay(1000);
   }
