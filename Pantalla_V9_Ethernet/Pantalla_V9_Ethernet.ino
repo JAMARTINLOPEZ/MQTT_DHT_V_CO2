@@ -9,7 +9,7 @@ Preferences preferences;
 #define LGFX_USE_V1         // set to use new version of library
 //#define LGFX_AUTODETECT
 
-#include <WiFi.h>
+//#include <WiFi.h>
 #include <WebServer.h>
 
 #include <LovyanGFX.hpp>    // main library
@@ -18,6 +18,8 @@ Preferences preferences;
 #include <lvgl.h>
 #include "lv_conf.h"
 
+#include <SPI.h>
+#include <Ethernet.h>
 
 #include <WiFi.h>
 #include <PubSubClient.h>
@@ -60,26 +62,39 @@ MHZ19 myMHZ19;
 #define TOPIC_TEMPERATURA "homeassistant/" NUMERO_SONDA "/temperature"
 #define TOPIC_CO2 "homeassistant/" NUMERO_SONDA "/co2"
 #define TOPIC_PULSADOR "homeassistant/" NUMERO_SONDA "/comluz"
+#define TOPIC_ESTADOPUERTAABIERTA "homeassistant/" NUMERO_SONDA "/estadopuertaabierta"
+#define TOPIC_ESTADOPUERTACERRADA "homeassistant/" NUMERO_SONDA "/estadopuertacerrada"
 
 
 int co2mhz;
 
 // Replace the next variables with your SSID/Password combination
-const char* ssid = "Lab_domotica";
-const char* password = "LaboratorioKNX";
+//const char* ssid = "Lab_domotica";
+//const char* password = "LaboratorioKNX";
 
+// Enter a MAC address for your controller below.
+// Newer Ethernet shields have a MAC address printed on a sticker on the shield
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+ 
+// Set the static IP address to use if the DHCP fails to assign
+#define MYIPADDR 172,16,0,28
+#define MYIPMASK 255,255,255,0
+#define MYDNS 172,16,0,1
+#define MYGW 172,16,0,1
 
-
+const int contactopuerta = 21;
 const int pulsador = 26;
 const int pinTension = 34;  // Pin de entrada para medir la tensión
 const int termostato = 27;
 const int puerta = 33;
 unsigned long lastMsg2 = 0;
 unsigned long lastMsg3 = 0;
+unsigned long lastMsg4 = 0;
 bool primeraEjecucion = true;
 int cambiarestadopulsador = 0;
 
-WiFiClient espClient;
+EthernetClient espClient;
+//WiFiClient espClient;
 PubSubClient client(espClient);
 long lastMsg = 0;
 char msg[50];
@@ -288,6 +303,7 @@ void setup() {
   pinMode(termostato, OUTPUT);
   pinMode(puerta, OUTPUT);
   pinMode(pulsador, INPUT);
+  pinMode(contactopuerta, INPUT);
   digitalWrite(termostato, LOW);
   digitalWrite(puerta, LOW);
   dht.begin();
@@ -309,38 +325,72 @@ void setup() {
  lcd.setCursor(20,60);
  lcd.print("Conectando a wifi");
 
+ Ethernet.init(5); 
+
+     if (Ethernet.begin(mac)) { // Dynamic IP setup
+        Serial.println("DHCP OK!");
+    }else{
+        Serial.println("Failed to configure Ethernet using DHCP");
+        // Check for Ethernet hardware present
+        if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+          Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
+          while (true) {
+            delay(1); // do nothing, no point running without Ethernet hardware
+          }
+        }
+        if (Ethernet.linkStatus() == LinkOFF) {
+          Serial.println("Ethernet cable is not connected.");
+        }
+ 
+          IPAddress ip(MYIPADDR);
+          IPAddress dns(MYDNS);
+          IPAddress gw(MYGW);
+          IPAddress sn(MYIPMASK);
+          Ethernet.begin(mac, ip, dns, gw, sn);
+          Serial.println("STATIC OK!");
+    }
+
+    Serial.print("Local IP : ");
+    Serial.println(Ethernet.localIP());
+    Serial.print("Subnet Mask : ");
+    Serial.println(Ethernet.subnetMask());
+    Serial.print("Gateway IP : ");
+    Serial.println(Ethernet.gatewayIP());
+    Serial.print("DNS Server : ");
+    Serial.println(Ethernet.dnsServerIP());
+ 
   preferences.begin("credentials", false);  // "credentials" es el espacio de preferencias
   String mqttBrokerIP = preferences.getString("mqttBrokerIP","");
 
   // Conectar al broker MQTT
   client.setServer(mqttBrokerIP.c_str(), 1883);
-  
+  //client.setClient(espClient);
  
- client.setCallback(callback);
- delay(5000);
- Serial.print("Sonda asignada a broker MQTT:" );
- Serial.println(mqttBrokerIP);
+  client.setCallback(callback);
+  delay(5000);
+  Serial.print("Sonda asignada a broker MQTT:" );
+  Serial.println(mqttBrokerIP);
 }
 
 void setup_wifi() {
   delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+  //Serial.print("Connecting to ");
+  //Serial.println(ssid);
 
-  WiFi.begin(ssid, password);
+  //WiFi.begin(ssid, password);
 
-  if (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  if (WiFi.status() == WL_CONNECTED) {
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-  }
+  //if (WiFi.status() != WL_CONNECTED) {
+    //delay(500);
+    //Serial.print(".");
+  //}
+  //if (WiFi.status() == WL_CONNECTED) {
+  //Serial.println("");
+  //Serial.println("WiFi connected");
+  //Serial.println("IP address: ");
+  //Serial.println(WiFi.localIP());
+  //}
 }
 
 void callback(char* topic, byte* message, unsigned int length) {
@@ -445,7 +495,7 @@ void loop() {
   int lecturaTension = analogRead(pinTension);
   float tension = (lecturaTension / 4095.0) * 3.3; // Convertir el valor analógico a voltaje
   int estadopulsador = digitalRead(pulsador);
-
+  int estadopuerta = digitalRead(contactopuerta);
 
   if (primeraEjecucion) {
     lcd.fillScreen(BLACK);
@@ -502,8 +552,21 @@ void loop() {
       
   }
  
+  long now4 = millis();
+  if (now4 -lastMsg4 > 1000){
+  char puertaString[8];
+  dtostrf(estadopuerta, 1, 2, puertaString);
+  if (estadopuerta == LOW){
+  client.publish(TOPIC_ESTADOPUERTACERRADA, "true");
+  //Serial.println("Puerta Cerrada");
+  }
+  else {
+      //Serial.println("Puerta abierta");
+      client.publish(TOPIC_ESTADOPUERTAABIERTA, "false");
+  }
 
-  
+
+
 
   long now = millis();
   if (now - lastMsg > 10000) {
@@ -541,15 +604,14 @@ void loop() {
     valores();
     }
   
-    if (WiFi.status() != WL_CONNECTED){
-    setup_wifi();
-    }
+    
     if (!client.connected()) {
-      reconnect();
+     reconnect();
     }
     client.loop();
     
   
+}
 }
 
 void valores(){
