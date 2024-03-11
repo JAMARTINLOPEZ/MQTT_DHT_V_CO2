@@ -82,7 +82,7 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 #define MYDNS 172,16,0,1
 #define MYGW 172,16,0,1
 
-const int contactopuerta = 21;
+const int contactopuerta = 2;
 const int pulsador = 26;
 const int pinTension = 34;  // Pin de entrada para medir la tensión
 const int termostato = 27;
@@ -554,6 +554,7 @@ void loop() {
  
   long now4 = millis();
   if (now4 -lastMsg4 > 1000){
+  lastMsg4 = now4;
   char puertaString[8];
   dtostrf(estadopuerta, 1, 2, puertaString);
   if (estadopuerta == LOW){

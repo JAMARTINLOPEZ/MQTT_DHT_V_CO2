@@ -1,5 +1,5 @@
 #include <Preferences.h>
-#include <nvs_flash.h> 
+#include <nvs_flash.h>
 Preferences preferences;
 #include <stdio.h>
 #include <freertos/FreeRTOS.h>
@@ -27,22 +27,22 @@ Preferences preferences;
 #include <MHZ19.h>
 
 MHZ19 myMHZ19;
-#define RXD0_PIN 3 
+#define RXD0_PIN 3
 #define TXD0_PIN 1
-#define RXD2 16 
+#define RXD2 16
 #define TXD2 17
-#define RXD1 25 
-#define TXD1 32 
+#define RXD1 25
+#define TXD1 32
 
 
 #define WHITE 0xFFFF
-#define BLACK 0x0000 
-#define RED 0xF800 
-#define GREEN 0x07E0 
-#define ORANGE 0xFCA0 
-#define BLUEe (20, 30, 166) 
-#define DARKblue (5, 7, 122) 
-#define BLUE 0x001F 
+#define BLACK 0x0000
+#define RED 0xF800
+#define GREEN 0x07E0
+#define ORANGE 0xFCA0
+#define BLUEe (20, 30, 166)
+#define DARKblue (5, 7, 122)
+#define BLUE 0x001F
 #define CYAN 0x07FF
 #define YELLOW 0xFFE0
 #define MAGENTA 0xF81F
@@ -62,15 +62,19 @@ MHZ19 myMHZ19;
 #define TOPIC_PULSADOR "homeassistant/" NUMERO_SONDA "/comluz"
 #define TOPIC_ESTADOPUERTAABIERTA "homeassistant/" NUMERO_SONDA "/estadopuertaabierta"
 #define TOPIC_ESTADOPUERTACERRADA "homeassistant/" NUMERO_SONDA "/estadopuertacerrada"
-#define TOPIC_ESTADOPUERTA "homeassistant/" NUMERO_SONDA "/estadopuerta"
+
+
 
 int co2mhz;
 
 // Replace the next variables with your SSID/Password combination
-//const char* ssid = "Lab_domotica";
-//const char* password = "LaboratorioKNX";
 const char* ssid = "UIDEE";
 const char* password = "Domotica4$";
+
+int estadoanteriorpuerta;
+int estadoanteriorpulsador;
+int estadoanteriorled;
+float tensionanterior;
 
 
 const int contactopuerta = 2;
@@ -111,7 +115,6 @@ void valores();
 
 
 
-
 static LGFX lcd;
 
 
@@ -122,8 +125,8 @@ static LGFX lcd;
 
 void setup() {
   Serial.begin(115200);
-  Serial1.begin(9600,SERIAL_8N1,RXD1,TXD1); 
-  myMHZ19.begin(Serial1); 
+  Serial1.begin(9600,SERIAL_8N1,RXD1,TXD1);
+  myMHZ19.begin(Serial1);
   myMHZ19.autoCalibration();
   pinMode(pinTension, INPUT);
   pinMode(termostato, OUTPUT);
@@ -141,9 +144,9 @@ void setup() {
 
 
 
- lcd.setRotation(1); 
- lcd.setBrightness(128); 
- lcd.setColorDepth(24); 
+ lcd.setRotation(1);
+ lcd.setBrightness(128);
+ lcd.setColorDepth(24);
  lcd.fillScreen(BLACK);
  lcd.drawRect(4, 2, 475, 315, BLACK);
  lcd.setTextColor(WHITE);
@@ -151,12 +154,21 @@ void setup() {
  lcd.setCursor(20,60);
  lcd.print("Conectando a wifi");
 
+
+  estadoanteriorpuerta = digitalRead(contactopuerta);
+  estadoanteriorpulsador = digitalRead(pulsador);
+  estadoanteriorled = analogRead(pinTension);
+  tensionanterior = (estadoanteriorled / 4095.0) * 3.3;
+
+
+
+
   preferences.begin("credentials", false);  // "credentials" es el espacio de preferencias
   String mqttBrokerIP = preferences.getString("mqttBrokerIP","");
 
   // Conectar al broker MQTT
   client.setServer(mqttBrokerIP.c_str(), 1883);
-  
+ 
  
  client.setCallback(callback);
  delay(5000);
@@ -190,7 +202,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   Serial.print(topic);
   Serial.print(". Message: ");
   String messageTemp;
-  
+ 
   for (int i = 0; i < length; i++) {
     Serial.print((char)message[i]);
     messageTemp += (char)message[i];
@@ -216,7 +228,7 @@ void callback(char* topic, byte* message, unsigned int length) {
       digitalWrite(termostato, LOW);
 
     }
-  
+ 
   }
     if (String(topic) == TOPIC_PUERTA) {
     Serial.print("Changing output to ");
@@ -237,8 +249,8 @@ void callback(char* topic, byte* message, unsigned int length) {
       digitalWrite(puerta, LOW);
 
     }
-  
-  }
+ 
+}
 }
 
 
@@ -253,6 +265,7 @@ void reconnect() {
       // Subscribe
       client.subscribe(TOPIC_TERMOSTATO);
       client.subscribe(TOPIC_PUERTA);
+ 
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -281,15 +294,15 @@ void loop() {
     Serial.println(mqttBrokerIP);
     Serial.println("Por favor, reinicie la sonda");
   }
-  
+ 
 
-  
+ 
   int lecturaTension = analogRead(pinTension);
   float tension = (lecturaTension / 4095.0) * 3.3; // Convertir el valor analógico a voltaje
   int estadopulsador = digitalRead(pulsador);
   int estadopuerta = digitalRead(contactopuerta);
-  int estadoanteriorpuerta = 0;
-
+ 
+ 
   if (primeraEjecucion) {
     lcd.fillScreen(BLACK);
     primeraEjecucion = false;
@@ -299,86 +312,48 @@ void loop() {
 
 
 
-  //long now3 = millis();
-  //if (now3 - lastMsg3 > 1000) {
-  //lastMsg3 = now3;
-  char pulsadorString[8];
-  dtostrf(estadopulsador, 1, 2, pulsadorString);
-  //Serial.print("Estado pulsador: ");
-  //Serial.print("Tensión medida: ");
-  //Serial.print(tension);
-  //Serial.println("V");
-  
-  if (estadopulsador == LOW && cambiarestadopulsador == 0){
+  if (estadopulsador != estadoanteriorpulsador && estadopulsador == HIGH){
   client.publish(TOPIC_PULSADOR, "true");
-  //Serial.println("Enviando encendido a luz");
-  cambiarestadopulsador = 1;
-  delay(1000);
+  Serial.println("Enviando encendido a luz");
+ 
   }
-  else{
-  //client.publish("homeassistant/quarth-meter2/comluz", "false")
-    cambiarestadopulsador = 0;
-  }
-  //}
-  
+  estadoanteriorpulsador = estadopulsador;
 
 
-
-
-  long now2 = millis();
-  if (now2 - lastMsg2 > 1000) {
-    lastMsg2 = now2;
-    char tensionString[8];
-    dtostrf(tension, 1, 2, tensionString);
-    //Serial.print("Estado termostato: ");
-    // Comparación numérica, no con cadenas de texto
+ 
+    if (abs(tension - tensionanterior) > 0.1) { // You can adjust the threshold value (0.1) based on your requirements
     if (tension >= 3) {
-      //Serial.println("on");
-      // Si la tensión es 3.3, publica "on"
       client.publish(TOPIC_LEDON, "100");
-          }   
-      else {
-      //Serial.println("off");
-      // Si la tensión no es 3.3, publica "off"
+    } else {
       client.publish(TOPIC_LEDOFF, "0");
-      }
-      
+    }
+    tensionanterior = tension;
   }
- /**
-  long now4 = millis();
-  if (now4 -lastMsg4 > 1000){
-  lastMsg4 = now4;
-  char puertaString[8];
-  dtostrf(estadopuerta, 1, 2, puertaString);
-  if (estadopuerta == LOW){
-  client.publish(TOPIC_ESTADOPUERTACERRADA, "true");
-  //Serial.println("Puerta Cerrada");
-  }
-  else {
-      //Serial.println("Puerta abierta");
-      client.publish(TOPIC_ESTADOPUERTAABIERTA, "false");
-  }
- **/
 
-  if (estadopuerta != estadoanteriorpuerta) {
+  if (estadopuerta != estadoanteriorpuerta){
+ 
     if (estadopuerta == LOW) {
-    Serial.print("Cambio de estado: ");
-    Serial.println(estadopuerta);
-    client.publish(TOPIC_ESTADOPUERTA, "false");
-    
-  }
-  else{
-    client.publish(TOPIC_ESTADOPUERTA, "true");
-  }
-  delay(50);
-  }
+       client.publish(TOPIC_ESTADOPUERTACERRADA, "true");
+         Serial.println("Puerta Cerrada");
+    } else {
+     
+      Serial.println("Puerta Abierta");
+     
+      client.publish(TOPIC_ESTADOPUERTAABIERTA, "false");
+    }
+
+ 
   estadoanteriorpuerta = estadopuerta;
+  }
+
+
+ 
 
   long now = millis();
   if (now - lastMsg > 30000) {
     lastMsg = now;
-    
-    co2mhz = myMHZ19.getCO2(); 
+   
+    co2mhz = myMHZ19.getCO2();
     char co2String[8];
     dtostrf(co2mhz, 1, 2, co2String);
     //Serial.print("Co2: ");
@@ -386,11 +361,11 @@ void loop() {
     client.publish(TOPIC_CO2, co2String);
 
     // Temperature in Celsius
-    temperature = dht.readTemperature();   
-    // Uncomment the next line to set temperature in Fahrenheit 
+    temperature = dht.readTemperature();  
+    // Uncomment the next line to set temperature in Fahrenheit
     // (and comment the previous temperature line)
     //temperature = 1.8 * bme.readTemperature() + 32; // Temperature in Fahrenheit
-    
+   
     // Convert the value to a char array
     char tempString[8];
     dtostrf(temperature, 1, 2, tempString);
@@ -399,7 +374,7 @@ void loop() {
     client.publish(TOPIC_TEMPERATURA, tempString);
 
     humidity = dht.readHumidity();
-    
+   
     // Convert the value to a char array
     char humString[8];
     dtostrf(humidity, 1, 2, humString);
@@ -409,7 +384,7 @@ void loop() {
 
     valores();
     }
-  
+ 
     if (WiFi.status() != WL_CONNECTED){
     setup_wifi();
     }
@@ -417,10 +392,9 @@ void loop() {
       reconnect();
     }
     client.loop();
-    
-  
+   
+ 
 }
-
 
 
 
@@ -589,6 +563,9 @@ const unsigned short img[27864] PROGMEM = {
 0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,// row 161, 27864 pixels
 };
 
+
+
+
 void valores(){
  lcd.fillScreen(WHITE);
  lcd.setTextSize(1); lcd.setTextColor(UMA); lcd.setFont(&fonts::Font7);
@@ -601,7 +578,7 @@ void valores(){
  lcd.setTextSize(2); lcd.setTextColor(BLACK); lcd.setFont(&fonts::DejaVu18);
  lcd.setCursor(30 + widthTemp,screenHeight-270); lcd.print("C");
  lcd.setCursor(270 + widthHum,screenHeight-270); lcd.print("%");
- lcd.setCursor(10 + widthCO2,screenHeight-100); lcd.print("ppm"); 
+ lcd.setCursor(10 + widthCO2,screenHeight-100); lcd.print("ppm");
  lcd.pushImage(280, 150, 172, 162, img);
  //delay(10000);
 }
