@@ -288,7 +288,7 @@ void loop() {
   float tension = (lecturaTension / 4095.0) * 3.3; // Convertir el valor analógico a voltaje
   int estadopulsador = digitalRead(pulsador);
   int estadopuerta = digitalRead(contactopuerta);
-  int estadoanteriorpuerta = 0;
+  
 
   if (primeraEjecucion) {
     lcd.fillScreen(BLACK);
@@ -344,7 +344,7 @@ void loop() {
       }
       
   }
- /**
+ 
   long now4 = millis();
   if (now4 -lastMsg4 > 1000){
   lastMsg4 = now4;
@@ -358,21 +358,8 @@ void loop() {
       //Serial.println("Puerta abierta");
       client.publish(TOPIC_ESTADOPUERTAABIERTA, "false");
   }
- **/
+ 
 
-  if (estadopuerta != estadoanteriorpuerta) {
-    if (estadopuerta == LOW) {
-    Serial.print("Cambio de estado: ");
-    Serial.println(estadopuerta);
-    client.publish(TOPIC_ESTADOPUERTA, "false");
-    
-  }
-  else{
-    client.publish(TOPIC_ESTADOPUERTA, "true");
-  }
-  delay(50);
-  }
-  estadoanteriorpuerta = estadopuerta;
 
   long now = millis();
   if (now - lastMsg > 30000) {
