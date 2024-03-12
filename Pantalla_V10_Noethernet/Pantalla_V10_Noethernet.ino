@@ -312,7 +312,7 @@ void loop() {
 
 
 
-  if (estadopulsador != estadoanteriorpulsador && estadopulsador == HIGH){
+  if (estadopulsador != estadoanteriorpulsador && estadopulsador == LOW){
   client.publish(TOPIC_PULSADOR, "true");
   Serial.println("Enviando encendido a luz");
  
